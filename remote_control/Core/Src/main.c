@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "iwdg.h"
 #include "rtc.h"
 #include "tim.h"
 #include "usart.h"
@@ -51,7 +52,7 @@
 // 红外模块的模式，学码 - 0  发码 - 1
 int codeFlag = 1;
 // 空调开机运行时间，单位 s
-int runningTime = 480;
+int runningTime = 600;
 // 空调从停机到下次开机的时间，单位 s
 int waitTime = 3600;
 // 空调每天周期性运行时长，24小时制，时分表示。 08:30表示运行8小时30分钟。
@@ -134,9 +135,10 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   MX_RTC_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
-	HAL_UART_Receive_IT(&huart1, uart1_RxBuff, 255);
-	HAL_UART_Receive_IT(&huart2, uart2_RxBuff, 255);
+	//HAL_UART_Receive_IT(&huart1, uart1_RxBuff, 255);
+	//HAL_UART_Receive_IT(&huart2, uart2_RxBuff, 255);
 	if(codeFlag == 1)
 	{
 		HAL_TIM_Base_Start_IT(&htim2);
@@ -210,7 +212,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		counter = 0;
 		systemRunningTime ++;
-		HAL_RTC_GetTime(&hrtc, &currentTime, RTC_FORMAT_BIN);
+		HAL_IWDG_Refresh(&hiwdg);	// 喂狗
+		HAL_RTC_GetTime(&hrtc, &currentTime, RTC_FORMAT_BIN);	// 获取日期
 		sprintf(t_buff, "%02d:%02d", currentTime.Hours, currentTime.Minutes);
 		if(isInterval == 1 && runFlag == 1 && systemRunningTime >= runningTime)
 		{
@@ -226,7 +229,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			uint16_t codeLen = IR_Send_Pack(SendCode1, 0);
 			HAL_UART_Transmit_IT(&huart1, SendCode1, codeLen);
 		}
-		if(isInterval == 1 && strcmp(t_buff, interval) == 0)
+		if(isInterval == 1 && strcmp(t_buff, interval) == 0)	// 停止周期运行
 		{
 			isInterval = 0;
 			systemRunningTime = 0;
@@ -234,7 +237,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			uint16_t codeLen = IR_Send_Pack(SendCode2, 1);
 			HAL_UART_Transmit_IT(&huart1, SendCode2, codeLen);
 		}
-		if(isInterval == 0 && strcmp(t_buff, startTime) == 0)
+		if(isInterval == 0 && strcmp(t_buff, startTime) == 0)		// 开始周期运行
 		{
 			isInterval = 1;
 			runFlag = 1;
